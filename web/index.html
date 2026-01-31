@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hit & Blow - Premium Web Edition</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --primary: #3b82f6;
+            --accent: #8b5cf6;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --hit-color: #10b981;
+            --blow-color: #f59e0b;
+            --error-color: #ef4444;
+            --glass-border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        body {
+            background: radial-gradient(circle at top right, #1e1b4b, #0f172a);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            border: var(--glass-border);
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        header {
+            text-align: center;
+        }
+
+        h1 {
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        /* Mode Selector */
+        .mode-selector {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 1rem;
+            background: rgba(15, 23, 42, 0.5);
+            padding: 5px;
+            border-radius: 12px;
+        }
+
+        .mode-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .mode-btn.active {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 2px 10px rgba(59, 130, 246, 0.3);
+        }
+
+        .mode-btn:hover:not(.active) {
+            color: white;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .game-status {
+            text-align: center;
+            font-size: 1.2rem;
+            font-weight: 600;
+            min-height: 1.5em;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .current-player-badge {
+            background: var(--accent);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+        }
+
+        .input-area {
+            display: flex;
+            gap: 10px;
+            flex-direction: column;
+        }
+
+        .digit-inputs {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .digit-input {
+            width: 60px;
+            height: 70px;
+            font-size: 2rem;
+            text-align: center;
+            background: rgba(15, 23, 42, 0.5);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            color: white;
+            transition: all 0.2s;
+        }
+
+        .digit-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);
+        }
+
+        .digit-input:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .action-btn {
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            border: none;
+            padding: 14px;
+            border-radius: 12px;
+            color: white;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s;
+            margin-top: 10px;
+        }
+
+        .action-btn:hover {
+            opacity: 0.9;
+        }
+
+        .action-btn:active {
+            transform: scale(0.98);
+        }
+
+        .action-btn:disabled {
+            background: var(--text-muted);
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .history {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        /* Scrollbar styling */
+        .history::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .history::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.03);
+            padding: 12px 16px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .history-item.ai-move {
+            border-left: 3px solid var(--accent);
+            background: rgba(139, 92, 246, 0.1);
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .guess-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .player-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .guess-nums {
+            font-family: monospace;
+            font-size: 1.25rem;
+            letter-spacing: 4px;
+            font-weight: 700;
+        }
+
+        .result-badges {
+            display: flex;
+            gap: 8px;
+        }
+
+        .badge {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .hit-badge {
+            background: var(--hit-color);
+        }
+
+        .blow-badge {
+            background: var(--blow-color);
+        }
+
+        .message-area {
+            text-align: center;
+            color: var(--error-color);
+            min-height: 1.2rem;
+            font-size: 0.9rem;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(5px);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+            z-index: 100;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .modal {
+            background: #1e293b;
+            padding: 2rem;
+            border-radius: 20px;
+            text-align: center;
+            max-width: 90%;
+            width: 400px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transform: scale(0.9);
+            transition: transform 0.3s;
+        }
+
+        .modal-overlay.active .modal {
+            transform: scale(1);
+        }
+
+        .modal h2 {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(to right, #4ade80, #3b82f6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .modal p {
+            color: var(--text-muted);
+            margin-bottom: 2rem;
+        }
+
+        .secret-reveal {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: white;
+            margin: 1rem 0;
+            letter-spacing: 8px;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 1rem;
+            height: 1rem;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <header>
+            <h1>HIT & BLOW</h1>
+            <div class="subtitle">Crack the 4-digit secret code</div>
+
+            <div class="mode-selector">
+                <button class="mode-btn active" onclick="switchMode('single')">Single</button>
+                <button class="mode-btn" onclick="switchMode('pvp')">PvP (2P)</button>
+                <button class="mode-btn" onclick="switchMode('ai')">Human vs AI</button>
+            </div>
+        </header>
+
+        <div class="game-status">
+            <span id="turn-badge" class="current-player-badge" style="display:none">P1</span>
+            <span id="turn-display">Turn 1</span>
+        </div>
+
+        <div class="input-area">
+            <div class="digit-inputs" id="input-container">
+                <input type="text" maxlength="1" class="digit-input" data-index="0" inputmode="numeric">
+                <input type="text" maxlength="1" class="digit-input" data-index="1" inputmode="numeric">
+                <input type="text" maxlength="1" class="digit-input" data-index="2" inputmode="numeric">
+                <input type="text" maxlength="1" class="digit-input" data-index="3" inputmode="numeric">
+            </div>
+            <div class="message-area" id="message-area"></div>
+            <button class="action-btn" id="call-btn">CALL</button>
+        </div>
+
+        <div class="history" id="history-list">
+            <!-- History items will appear here -->
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="result-modal">
+        <div class="modal">
+            <h2 id="modal-title">SUCCESS!</h2>
+            <div class="secret-reveal" id="modal-secret">1234</div>
+            <p id="modal-stats">You found the secret in 5 turns.</p>
+            <button class="action-btn" id="restart-btn" style="width: 100%">PLAY AGAIN</button>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * HitAndBlow Solver JS Implementation
+         * Ported from the Python implementation.
+         */
+        class HitAndBlowSolver {
+            constructor(digits = 4) {
+                this.digits = digits;
+                // Generate all permutations (approx 5040 for 4 digits)
+                this.allPermutations = this.generatePermutations(
+                    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+                    digits
+                );
+                this.candidates = [...this.allPermutations];
+                this.firstGuess = [0, 1, 2, 3];
+            }
+
+            generatePermutations(arr, size) {
+                const results = [];
+                const used = new Set();
+
+                function backtrack(current) {
+                    if (current.length === size) {
+                        results.push([...current]);
+                        return;
+                    }
+
+                    for (let i = 0; i < arr.length; i++) {
+                        if (!used.has(arr[i])) {
+                            used.add(arr[i]);
+                            current.push(arr[i]);
+                            backtrack(current);
+                            current.pop();
+                            used.delete(arr[i]);
+                        }
+                    }
+                }
+                backtrack([]);
+                return results;
+            }
+
+            reset() {
+                this.candidates = [...this.allPermutations];
+            }
+
+            /**
+             * Update candidates based on guess and result
+             */
+            update(guess, hit, blow) {
+                const newCandidates = [];
+                for (const candidate of this.candidates) {
+                    const res = this.judge(guess, candidate);
+                    if (res.hit === hit && res.blow === blow) {
+                        newCandidates.push(candidate);
+                    }
+                }
+                this.candidates = newCandidates;
+                console.log(`[AI Solver] Candidates remaining: ${this.candidates.length}`);
+            }
+
+            /**
+             * Calculate Hit and Blow
+             */
+            judge(guess, secret) {
+                let hit = 0, blow = 0;
+                for (let i = 0; i < this.digits; i++) {
+                    if (guess[i] === secret[i]) {
+                        hit++;
+                    } else if (secret.includes(guess[i])) {
+                        blow++;
+                    }
+                }
+                return { hit, blow };
+            }
+
+            /**
+             * Decide the next query
+             */
+            suggestMove() {
+                const N = this.candidates.length;
+
+                // 1. If only one candidate left, it's the answer
+                if (N === 1) {
+                    return this.candidates[0];
+                }
+
+                // 2. First move is fixed (optimization)
+                if (N === this.allPermutations.length) {
+                    return this.firstGuess;
+                }
+
+                // 3. Strategy switching
+                if (N <= 50) {
+                    return this.suggestMoveMinimax(N);
+                } else {
+                    return this.suggestMoveEntropy(N);
+                }
+            }
+
+            suggestMoveEntropy(N) {
+                console.log("[AI] Analyzing with Entropy Strategy...");
+                let bestGuess = null;
+                let maxEntropy = -1.0;
+
+                // Optimizing search space: 
+                // If candidates are few (<= 200), search all permutations (including those not in candidates)
+                const searchSpace = (this.candidates.length <= 200) ? this.allPermutations : this.candidates;
+
+                // We perform calculation in sync (might accept slight UI freeze for 5040 loops)
+                for (const guess of searchSpace) {
+                    const outcomeCounts = {};
+
+                    // Check against all current candidates
+                    for (const secretCandidate of this.candidates) {
+                        const res = this.judge(guess, secretCandidate);
+                        // Create key "hit-blow"
+                        const key = `${res.hit}-${res.blow}`;
+                        outcomeCounts[key] = (outcomeCounts[key] || 0) + 1;
+                    }
+
+                    let entropy = 0.0;
+                    for (const key in outcomeCounts) {
+                        const count = outcomeCounts[key];
+                        const p = count / N;
+                        entropy -= p * Math.log2(p);
+                    }
+
+                    if (entropy > maxEntropy) {
+                        maxEntropy = entropy;
+                        bestGuess = guess;
+                    } else if (entropy === maxEntropy) {
+                        // Prefer guessing a number that is within candidates if entropy is same
+                        const isGuessInCandidates = this.candidates.some(c => this.arraysEqual(c, guess));
+                        const isBestInCandidates = bestGuess && this.candidates.some(c => this.arraysEqual(c, bestGuess));
+
+                        if (!isBestInCandidates && isGuessInCandidates) {
+                            bestGuess = guess;
+                        }
+                    }
+                }
+                return bestGuess;
+            }
+
+            suggestMoveMinimax(N) {
+                console.log("[AI] Analyzing with Minimax Strategy...");
+                let bestGuess = null;
+                let maxScore = -1.0;
+
+                const searchSpace = this.allPermutations; // Always search fully for precision when N is small
+
+                for (const guess of searchSpace) {
+                    const outcomeCounts = {};
+
+                    for (const secretCandidate of this.candidates) {
+                        const res = this.judge(guess, secretCandidate);
+                        const key = `${res.hit}-${res.blow}`;
+                        outcomeCounts[key] = (outcomeCounts[key] || 0) + 1;
+                    }
+
+                    const isGuessInCandidates = this.candidates.some(c => this.arraysEqual(c, guess));
+                    const pImmediateWin = isGuessInCandidates ? (1.0 / N) : 0.0;
+                    let pSurviveNext = 0.0;
+
+                    for (const key in outcomeCounts) {
+                        const count = outcomeCounts[key];
+                        const probOutcome = count / N;
+
+                        let opponentWinRate = 0;
+                        if (count > 0) {
+                            opponentWinRate = Math.floor((count + 1) / 2) / count;
+                        }
+
+                        pSurviveNext += probOutcome * (1.0 - opponentWinRate);
+                    }
+
+                    const totalScore = pImmediateWin + pSurviveNext;
+
+                    if (totalScore > maxScore) {
+                        maxScore = totalScore;
+                        bestGuess = guess;
+                    } else if (totalScore === maxScore) {
+                        const isBestInCandidates = bestGuess && this.candidates.some(c => this.arraysEqual(c, bestGuess));
+                        if (!isBestInCandidates && isGuessInCandidates) {
+                            bestGuess = guess;
+                        }
+                    }
+                }
+
+                return bestGuess;
+            }
+
+            arraysEqual(a, b) {
+                if (a === b) return true;
+                if (a == null || b == null) return false;
+                if (a.length !== b.length) return false;
+                for (let i = 0; i < a.length; ++i) {
+                    if (a[i] !== b[i]) return false;
+                }
+                return true;
+            }
+        }
+
+        /**
+         * Main Game Controller
+         */
+        class HitAndBlowGame {
+            constructor() {
+                this.digits = 4;
+                this.mode = 'single'; // single, pvp, ai
+                this.secret = [];
+                this.history = [];
+                this.state = 'playing'; // playing, won
+                this.players = ['Player 1', 'Player 2'];
+                this.currentPlayerIndex = 0;
+                this.turnCount = 1;
+
+                // Client-side AI Solver
+                this.aiSolver = new HitAndBlowSolver(this.digits);
+            }
+
+            init(mode) {
+                this.mode = mode;
+                this.secret = this.generateSecret();
+                this.history = [];
+                this.state = 'playing';
+                this.currentPlayerIndex = 0;
+                this.turnCount = 1;
+
+                if (this.mode === 'ai') {
+                    this.aiSolver.reset();
+                }
+            }
+
+            generateSecret() {
+                const range = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+                const secret = [];
+                for (let i = 0; i < this.digits; i++) {
+                    const index = Math.floor(Math.random() * range.length);
+                    secret.push(range[index]);
+                    range.splice(index, 1);
+                }
+                return secret;
+            }
+
+            validateGuess(guessStr) {
+                if (guessStr.length !== this.digits) return { valid: false, message: `Please enter ${this.digits} digits.` };
+                if (!/^\d+$/.test(guessStr)) return { valid: false, message: "Only numbers are allowed." };
+                if (new Set(guessStr.split('')).size !== this.digits) return { valid: false, message: "Numbers cannot be repeated." };
+                return { valid: true, list: guessStr.split('').map(Number) };
+            }
+
+            judge(guessList) {
+                let hit = 0, blow = 0;
+                guessList.forEach((g, i) => {
+                    if (g === this.secret[i]) hit++;
+                    else if (this.secret.includes(g)) blow++;
+                });
+                return { hit, blow };
+            }
+
+            getCurrentPlayerName() {
+                if (this.mode === 'single') return 'You';
+                if (this.mode === 'ai') return this.currentPlayerIndex === 0 ? 'You' : 'AI';
+                return this.players[this.currentPlayerIndex];
+            }
+
+            submitGuess(guessStr) {
+                if (this.state !== 'playing') return { valid: false };
+
+                const validation = this.validateGuess(guessStr);
+                if (!validation.valid) return validation;
+
+                const guessList = validation.list;
+                const result = this.judge(guessList);
+
+                const turnData = {
+                    turn: this.turnCount,
+                    player: this.getCurrentPlayerName(),
+                    playerIndex: this.currentPlayerIndex,
+                    guess: guessStr,
+                    hit: result.hit,
+                    blow: result.blow
+                };
+
+                this.history.unshift(turnData);
+
+                if (result.hit === this.digits) {
+                    this.state = 'won';
+                } else {
+                    // Switch turn logic
+                    if (this.mode !== 'single') {
+                        this.currentPlayerIndex = 1 - this.currentPlayerIndex;
+                        if (this.currentPlayerIndex === 0) {
+                            this.turnCount++;
+                        }
+                    } else {
+                        this.turnCount++;
+                    }
+                }
+
+                // Sync with AI Solver (Update candidates)
+                if (this.mode === 'ai') {
+                    this.aiSolver.update(guessList, result.hit, result.blow);
+                }
+
+                return { valid: true, result: turnData, won: this.state === 'won' };
+            }
+        }
+
+        // --- UI Controller ---
+        const game = new HitAndBlowGame();
+        const inputs = document.querySelectorAll('.digit-input');
+        const callBtn = document.getElementById('call-btn');
+        const messageArea = document.getElementById('message-area');
+        const historyList = document.getElementById('history-list');
+        const turnDisplay = document.getElementById('turn-display');
+        const turnBadge = document.getElementById('turn-badge');
+        const resultModal = document.getElementById('result-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalSecret = document.getElementById('modal-secret');
+        const modalStats = document.getElementById('modal-stats');
+        const restartBtn = document.getElementById('restart-btn');
+        const modeBtns = document.querySelectorAll('.mode-btn');
+
+        let isAiThinking = false;
+
+        // Inputs
+        inputs.forEach((input, idx) => {
+            input.addEventListener('input', (e) => {
+                e.target.value = e.target.value.replace(/[^0-9]/g, '');
+                if (e.target.value.length === 1 && idx < inputs.length - 1) inputs[idx + 1].focus();
+            });
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Backspace' && !e.target.value && idx > 0) inputs[idx - 1].focus();
+                if (e.key === 'Enter') handleCall();
+            });
+        });
+
+        callBtn.addEventListener('click', handleCall);
+        restartBtn.addEventListener('click', () => startNewGame(game.mode));
+
+        function switchMode(mode) {
+            modeBtns.forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`button[onclick="switchMode('${mode}')"]`).classList.add('active');
+            startNewGame(mode);
+        }
+
+        function startNewGame(mode) {
+            game.init(mode);
+            clearInputs();
+            historyList.innerHTML = '';
+            messageArea.textContent = '';
+            resultModal.classList.remove('active');
+            isAiThinking = false;
+            callBtn.disabled = false;
+            inputs.forEach(i => i.disabled = false);
+            updateTurnDisplay();
+            inputs[0].focus();
+        }
+
+        function updateTurnDisplay() {
+            turnDisplay.textContent = `Turn ${game.turnCount}`;
+
+            if (game.mode === 'single') {
+                turnBadge.style.display = 'none';
+            } else {
+                turnBadge.style.display = 'inline-block';
+                turnBadge.textContent = game.getCurrentPlayerName();
+                turnBadge.style.background = game.currentPlayerIndex === 1 ? 'var(--accent)' : 'var(--primary)';
+            }
+        }
+
+        function handleCall() {
+            if (game.state !== 'playing' || isAiThinking) return;
+
+            let guessStr = '';
+            inputs.forEach(input => guessStr += input.value);
+
+            const response = game.submitGuess(guessStr);
+
+            if (!response.valid) {
+                showMessage(response.message);
+                shakeInputs();
+                return;
+            }
+
+            // Success
+            showMessage('');
+            clearInputs();
+            updateHistory(response.result);
+
+            if (response.won) {
+                showWinModal(response.result.player);
+            } else {
+                updateTurnDisplay();
+
+                // Check if it's AI's turn
+                if (game.mode === 'ai' && game.currentPlayerIndex === 1) {
+                    runAiTurn();
+                } else {
+                    inputs[0].focus();
+                }
+            }
+        }
+
+        async function runAiTurn() {
+            isAiThinking = true;
+            callBtn.disabled = true;
+            inputs.forEach(i => i.disabled = true);
+            callBtn.innerHTML = '<div class="spinner"></div> AI Thinking...';
+
+            // Brief delay to allow UI to update and ensure realistic pacing
+            await new Promise(r => setTimeout(r, 600));
+
+            // Use setTimeout to avoid blocking UI update immediately
+            setTimeout(() => {
+                try {
+                    // Get AI move
+                    const aiGuessList = game.aiSolver.suggestMove();
+                    const aiGuess = aiGuessList.join('');
+
+                    // Submit AI Move
+                    const response = game.submitGuess(aiGuess);
+
+                    // Update UI
+                    updateHistory(response.result);
+
+                    if (response.won) {
+                        showWinModal('AI');
+                    } else {
+                        updateTurnDisplay();
+                        // Enable inputs for human
+                        inputs[0].focus();
+                    }
+
+                } catch (e) {
+                    console.error("AI Logic Error", e);
+                    showMessage("AI error occurred.");
+                } finally {
+                    isAiThinking = false;
+                    callBtn.disabled = false;
+                    inputs.forEach(i => i.disabled = false);
+                    callBtn.textContent = 'CALL';
+                }
+            }, 100);
+        }
+
+        function showMessage(msg) {
+            messageArea.textContent = msg;
+        }
+
+        function shakeInputs() {
+            const container = document.getElementById('input-container');
+            container.animate([
+                { transform: 'translateX(0)' }, { transform: 'translateX(-10px)' },
+                { transform: 'translateX(10px)' }, { transform: 'translateX(-10px)' },
+                { transform: 'translateX(0)' }
+            ], { duration: 300 });
+        }
+
+        function clearInputs() {
+            inputs.forEach(input => input.value = '');
+        }
+
+        function updateHistory(result) {
+            const item = document.createElement('div');
+            item.className = 'history-item';
+            if (result.player === 'AI' || result.player === 'Player 2') {
+                item.classList.add('ai-move');
+            }
+
+            item.innerHTML = `
+            <div class="guess-info">
+                <span class="player-label">${result.player} (Turn ${result.turn})</span>
+                <div class="guess-nums">${result.guess}</div>
+            </div>
+            <div class="result-badges">
+                <span class="badge hit-badge">${result.hit} HIT</span>
+                <span class="badge blow-badge">${result.blow} BLOW</span>
+            </div>
+        `;
+            historyList.prepend(item);
+        }
+
+        function showWinModal(winnerName) {
+            modalTitle.textContent = winnerName === 'You' ? 'SUCCESS!' : `${winnerName} WINS!`;
+            modalSecret.textContent = game.secret.join('');
+            modalStats.textContent = `Secret found in ${game.turnCount} turns.`;
+            resultModal.classList.add('active');
+        }
+
+        // Initialize
+        startNewGame('single');
+
+    </script>
+</body>
+
+</html>
