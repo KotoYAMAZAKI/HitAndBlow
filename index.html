@@ -869,9 +869,27 @@
         // Inputs
         inputs.forEach((input, idx) => {
             input.addEventListener('input', (e) => {
-                e.target.value = e.target.value.replace(/[^0-9]/g, '');
+                let val = e.target.value.replace(/[^0-9]/g, '');
+
+                // Real-time duplicate prevention
+                if (val.length > 0) {
+                    const isDuplicate = Array.from(inputs).some((otherInput, otherIdx) => {
+                        return otherIdx !== idx && otherInput.value === val;
+                    });
+
+                    if (isDuplicate) {
+                        val = ''; // Reject duplicate
+                        // Optional: Visual cue could be added here
+                    }
+                }
+
+                e.target.value = val;
+
                 if (e.target.value.length === 1 && idx < inputs.length - 1) inputs[idx + 1].focus();
+
+                updateCallButtonState();
             });
+
             input.addEventListener('keydown', (e) => {
                 if (e.key === 'Backspace' && !e.target.value && idx > 0) inputs[idx - 1].focus();
                 if (e.key === 'Enter') handleCall();
@@ -889,6 +907,27 @@
             resultModal.classList.add('active');
         });
 
+        function updateCallButtonState() {
+            // If AI is thinking or Demo is potentially running (and button shows Stop/Restart etc), don't auto-disable based on inputs
+            // We only manage the button state when it is "CALL" or "START AUTO SOLVE" (the initial action)
+            const btnText = callBtn.textContent;
+            if (btnText !== 'CALL' && btnText !== 'START AUTO SOLVE') {
+                return;
+            }
+
+            let isFilled = true;
+            inputs.forEach(i => {
+                if (!i.value) isFilled = false;
+            });
+
+            callBtn.disabled = !isFilled;
+            if (isFilled) {
+                callBtn.classList.remove('disabled');
+            } else {
+                callBtn.classList.add('disabled');
+            }
+        }
+
         function switchMode(mode) {
             modeBtns.forEach(btn => btn.classList.remove('active'));
             document.querySelector(`button[onclick="switchMode('${mode}')"]`).classList.add('active');
@@ -903,7 +942,7 @@
             resultModal.classList.remove('active');
             showResultBtn.style.display = 'none'; // Hide floating btn
             isAiThinking = false;
-            callBtn.disabled = false;
+
             inputs.forEach(i => i.disabled = false);
             updateTurnDisplay();
 
@@ -917,6 +956,8 @@
                 callBtn.textContent = 'CALL';
                 inputs[0].focus();
             }
+
+            updateCallButtonState(); // Initialize button state (Disabled because inputs are empty)
         }
 
         function updateTurnDisplay() {
