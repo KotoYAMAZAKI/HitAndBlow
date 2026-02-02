@@ -366,7 +366,14 @@
             <div class="mode-selector">
                 <button class="mode-btn active" onclick="switchMode('single')">Single</button>
                 <button class="mode-btn" onclick="switchMode('pvp')">PvP (2P)</button>
-                <button class="mode-btn" onclick="switchMode('ai')">Human vs AI</button>
+                <button class="mode-btn" onclick="switchMode('demo')">AI Demo (Solve)</button>
+            </div>
+            <div class="mode-selector" style="margin-top: 5px; gap: 5px; flex-wrap: wrap;">
+                <span style="color:var(--text-muted); font-size:0.8rem; align-self:center;">VS AI:</span>
+                <button class="mode-btn" onclick="switchMode('ai-random')">Random</button>
+                <button class="mode-btn" onclick="switchMode('ai-simple')">Simple</button>
+                <button class="mode-btn" onclick="switchMode('ai-avoid')">Avoid</button>
+                <button class="mode-btn" onclick="switchMode('ai')">Standard</button>
             </div>
         </header>
 
@@ -478,7 +485,7 @@
             /**
              * Decide the next query
              */
-            suggestMove() {
+            suggestMove(strategy = 'standard') {
                 const N = this.candidates.length;
 
                 // 1. If only one candidate left, it's the answer
@@ -486,12 +493,17 @@
                     return this.candidates[0];
                 }
 
-                // 2. First move is fixed (optimization)
+                // 2. Strategy dispatch
+                if (strategy === 'random') return this.suggestMoveRandom();
+                if (strategy === 'simple') return this.suggestMoveSimple(N);
+                if (strategy === 'avoid') return this.suggestMoveAvoid(N);
+
+                // Default: Standard (Balanced)
+                // 1. First move fixed for optimization
                 if (N === this.allPermutations.length) {
                     return this.firstGuess;
                 }
-
-                // 3. Strategy switching
+                // 2. Mix
                 if (N <= 50) {
                     return this.suggestMoveMinimax(N);
                 } else {
@@ -499,23 +511,94 @@
                 }
             }
 
-            suggestMoveEntropy(N) {
-                console.log("[AI] Analyzing with Entropy Strategy...");
-                let bestGuess = null;
-                let maxEntropy = -1.0;
+            suggestMoveRandom() {
+                if (this.candidates.length === 0) return this.firstGuess;
+                const idx = Math.floor(Math.random() * this.candidates.length);
+                return this.candidates[idx];
+            }
 
-                // Optimizing search space: 
-                // If candidates are few (<= 200), search all permutations (including those not in candidates)
+            suggestMoveSimple(N) {
+                // "Simple" -> Pure Entropy / Maximize Algo Efficiency (Fastest Solve)
+                // This aligns with suggestMoveEntropy which aims to cut candidates most effective
+                return this.suggestMoveEntropy(N);
+            }
+
+            suggestMoveAvoid(N) {
+                // "Avoid" -> Pick most likely correct (Entropy) BUT avoid dangerous assists.
+                // "Dangerous" = leaving opponent with very few candidates (e.g. 1 or 2).
+
+                console.log("[AI] Analyzing with Avoid Strategy...");
+                let bestGuess = null;
+                let maxScore = -Infinity;
+
                 const searchSpace = (this.candidates.length <= 200) ? this.allPermutations : this.candidates;
 
-                // We perform calculation in sync (might accept slight UI freeze for 5040 loops)
                 for (const guess of searchSpace) {
                     const outcomeCounts = {};
 
-                    // Check against all current candidates
+                    // Simulate outcomes
                     for (const secretCandidate of this.candidates) {
                         const res = this.judge(guess, secretCandidate);
-                        // Create key "hit-blow"
+                        const key = `${res.hit}-${res.blow}`;
+                        outcomeCounts[key] = (outcomeCounts[key] || 0) + 1;
+                    }
+
+                    // Calculate Entropy (My Win / Info Gain)
+                    let entropy = 0.0;
+                    let maxOpponentWinChance = 0.0;
+
+                    for (const key in outcomeCounts) {
+                        const count = outcomeCounts[key];
+                        const p = count / N;
+                        entropy -= p * Math.log2(p);
+
+                        // Opponent Win Chance for this outcome
+                        // If count=1, Opponent Win=1.0. If count=2, 0.5.
+                        let oppWin = 0;
+                        if (count > 0) oppWin = Math.floor((count + 1) / 2) / count;
+                        if (oppWin > maxOpponentWinChance) maxOpponentWinChance = oppWin;
+                    }
+
+                    // Score Construction
+                    // We want high Entropy.
+                    // We want low MaxOpponentWinChance.
+                    // If MaxOpponentWinChance > 0.5 (Opponent likely to win), Penalty.
+
+                    let penalty = 0;
+                    if (maxOpponentWinChance >= 0.5) {
+                        penalty = 10; // Big penalty
+                    }
+                    if (maxOpponentWinChance >= 0.9) {
+                        penalty = 100; // Huge penalty for almost guaranteed loss
+                    }
+
+                    // Prioritize guessing from candidates (User requirement: "most likely correct number")
+                    const isCandidate = this.candidates.some(c => this.arraysEqual(c, guess));
+                    const candidateBonus = isCandidate ? 2.0 : 0.0;
+
+                    const score = entropy - penalty + candidateBonus;
+
+                    if (score > maxScore) {
+                        maxScore = score;
+                        bestGuess = guess;
+                    }
+                }
+
+                return bestGuess || this.suggestMoveEntropy(N); // Fallback
+            }
+
+            suggestMoveEntropy(N) {
+                // console.log("[AI] Analyzing with Entropy Strategy...");
+                let bestGuess = null;
+                let maxEntropy = -1.0;
+
+                const searchSpace = (this.candidates.length <= 200) ? this.allPermutations : this.candidates;
+
+                for (const guess of searchSpace) {
+                    const outcomeCounts = {};
+
+                    for (const secretCandidate of this.candidates) {
+                        const res = this.judge(guess, secretCandidate);
                         const key = `${res.hit}-${res.blow}`;
                         outcomeCounts[key] = (outcomeCounts[key] || 0) + 1;
                     }
@@ -531,7 +614,6 @@
                         maxEntropy = entropy;
                         bestGuess = guess;
                     } else if (entropy === maxEntropy) {
-                        // Prefer guessing a number that is within candidates if entropy is same
                         const isGuessInCandidates = this.candidates.some(c => this.arraysEqual(c, guess));
                         const isBestInCandidates = bestGuess && this.candidates.some(c => this.arraysEqual(c, bestGuess));
 
@@ -544,11 +626,11 @@
             }
 
             suggestMoveMinimax(N) {
-                console.log("[AI] Analyzing with Minimax Strategy...");
+                // console.log("[AI] Analyzing with Minimax Strategy...");
                 let bestGuess = null;
                 let maxScore = -1.0;
 
-                const searchSpace = this.allPermutations; // Always search fully for precision when N is small
+                const searchSpace = this.allPermutations;
 
                 for (const guess of searchSpace) {
                     const outcomeCounts = {};
@@ -608,13 +690,15 @@
         class HitAndBlowGame {
             constructor() {
                 this.digits = 4;
-                this.mode = 'single'; // single, pvp, ai
+                this.mode = 'single'; // single, pvp, ai, ai-random, ai-simple, ai-avoid, demo
                 this.secret = [];
                 this.history = [];
                 this.state = 'playing'; // playing, won
                 this.players = ['Player 1', 'Player 2'];
                 this.currentPlayerIndex = 0;
                 this.turnCount = 1;
+                this.demoTarget = [];
+                this.aiStrategy = 'standard';
 
                 // Client-side AI Solver
                 this.aiSolver = new HitAndBlowSolver(this.digits);
@@ -622,13 +706,23 @@
 
             init(mode) {
                 this.mode = mode;
+                this.aiStrategy = 'standard';
+
+                // Parse AI variations
+                if (mode.startsWith('ai-')) {
+                    this.aiStrategy = mode.replace('ai-', '');
+                } else if (mode === 'ai') {
+                    this.aiStrategy = 'standard';
+                }
+
                 this.secret = this.generateSecret();
                 this.history = [];
                 this.state = 'playing';
                 this.currentPlayerIndex = 0;
                 this.turnCount = 1;
+                this.demoTarget = [];
 
-                if (this.mode === 'ai') {
+                if (this.mode.startsWith('ai') || this.mode === 'demo') {
                     this.aiSolver.reset();
                 }
             }
@@ -651,29 +745,43 @@
                 return { valid: true, list: guessStr.split('').map(Number) };
             }
 
-            judge(guessList) {
+            judge(guessList, secret = this.secret) {
                 let hit = 0, blow = 0;
                 guessList.forEach((g, i) => {
-                    if (g === this.secret[i]) hit++;
-                    else if (this.secret.includes(g)) blow++;
+                    if (g === secret[i]) hit++;
+                    else if (secret.includes(g)) blow++;
                 });
                 return { hit, blow };
             }
 
             getCurrentPlayerName() {
                 if (this.mode === 'single') return 'You';
-                if (this.mode === 'ai') return this.currentPlayerIndex === 0 ? 'You' : 'AI';
+                if (this.mode.startsWith('ai')) return this.currentPlayerIndex === 0 ? 'You' : `AI (${this.aiStrategy})`;
+                if (this.mode === 'demo') return 'AI Solver';
                 return this.players[this.currentPlayerIndex];
             }
 
-            submitGuess(guessStr) {
+
+            // For Demo Mode
+            setDemoTarget(targetStr) {
+                const validation = this.validateGuess(targetStr);
+                if (!validation.valid) return validation;
+                this.demoTarget = validation.list;
+                return { valid: true };
+            }
+
+            submitGuess(guessStr, isDemoGuess = false) {
                 if (this.state !== 'playing') return { valid: false };
 
                 const validation = this.validateGuess(guessStr);
                 if (!validation.valid) return validation;
 
                 const guessList = validation.list;
-                const result = this.judge(guessList);
+
+                // Keep the secret as user-defined target in demo mode
+                const targetSecret = (this.mode === 'demo' && isDemoGuess) ? this.demoTarget : this.secret;
+
+                const result = this.judge(guessList, targetSecret);
 
                 const turnData = {
                     turn: this.turnCount,
@@ -690,7 +798,7 @@
                     this.state = 'won';
                 } else {
                     // Switch turn logic
-                    if (this.mode !== 'single') {
+                    if (this.mode !== 'single' && this.mode !== 'demo') {
                         this.currentPlayerIndex = 1 - this.currentPlayerIndex;
                         if (this.currentPlayerIndex === 0) {
                             this.turnCount++;
@@ -701,7 +809,7 @@
                 }
 
                 // Sync with AI Solver (Update candidates)
-                if (this.mode === 'ai') {
+                if (this.mode === 'ai' || this.mode === 'demo') {
                     this.aiSolver.update(guessList, result.hit, result.blow);
                 }
 
@@ -757,10 +865,32 @@
             callBtn.disabled = false;
             inputs.forEach(i => i.disabled = false);
             updateTurnDisplay();
-            inputs[0].focus();
+
+            // UI adjustments for Demo Mode
+            if (mode === 'demo') {
+                callBtn.textContent = 'START AUTO SOLVE';
+                turnDisplay.textContent = 'Set Target Number';
+                turnBadge.style.display = 'none';
+                inputs[0].focus();
+            } else {
+                callBtn.textContent = 'CALL';
+                inputs[0].focus();
+            }
         }
 
         function updateTurnDisplay() {
+            if (game.mode === 'demo') {
+                if (game.state === 'playing' && game.turnCount === 1 && game.history.length === 0) {
+                    turnDisplay.textContent = 'Set Target Number';
+                } else {
+                    turnDisplay.textContent = `Turn ${game.turnCount}`;
+                }
+                turnBadge.style.display = 'inline-block';
+                turnBadge.textContent = 'AI';
+                turnBadge.style.background = '#8b5cf6'; // accent
+                return;
+            }
+
             turnDisplay.textContent = `Turn ${game.turnCount}`;
 
             if (game.mode === 'single') {
@@ -774,6 +904,12 @@
 
         function handleCall() {
             if (game.state !== 'playing' || isAiThinking) return;
+
+            // Demo Mode Logic
+            if (game.mode === 'demo') {
+                handleDemoStart();
+                return;
+            }
 
             let guessStr = '';
             inputs.forEach(input => guessStr += input.value);
@@ -818,7 +954,7 @@
             setTimeout(() => {
                 try {
                     // Get AI move
-                    const aiGuessList = game.aiSolver.suggestMove();
+                    const aiGuessList = game.aiSolver.suggestMove(game.aiStrategy);
                     const aiGuess = aiGuessList.join('');
 
                     // Submit AI Move
@@ -847,6 +983,73 @@
             }, 100);
         }
 
+        async function handleDemoStart() {
+            // Get user input for target
+            let targetStr = '';
+            inputs.forEach(input => targetStr += input.value);
+
+            const validation = game.setDemoTarget(targetStr);
+            if (!validation.valid) {
+                showMessage(validation.message);
+                shakeInputs();
+                return;
+            }
+
+            // Start Solving Process
+            showMessage('');
+            inputs.forEach(i => i.disabled = true);
+            callBtn.disabled = true;
+            callBtn.innerHTML = '<div class="spinner"></div> AI Solving...';
+
+            // Show target in display
+            turnDisplay.textContent = `Target: ${targetStr}`;
+            clearInputs();
+
+            // Run loop
+            await runDemoLoop();
+        }
+
+        async function runDemoLoop() {
+            while (game.state === 'playing') {
+                // Delay for visualization speed
+                await new Promise(r => setTimeout(r, 1000));
+
+                try {
+                    // AI Suggests Move
+                    // Note: suggestMove() is synchronous but might take a split second for Entropy
+                    // We wrap in a tiny timeout to allow UI render if needed, but here we can just call it
+                    // since we have the await delay before.
+
+                    const aiGuessList = game.aiSolver.suggestMove();
+                    const aiGuess = aiGuessList.join('');
+
+                    const response = game.submitGuess(aiGuess, true);
+
+                    updateHistory(response.result);
+
+                    if (response.won) {
+                        showWinModal('AI Solver');
+                        callBtn.textContent = 'SOLVED / RESTART';
+                        callBtn.classList.remove('disabled');
+                        callBtn.onclick = () => startNewGame('demo');
+                        callBtn.disabled = false;
+                        return;
+                    }
+
+                    // Update turn number in display if logic assumes turn increases
+                    // turnDisplay.textContent is overwritten by "Target: XXXX", maybe append turn?
+                    // Let's keep "Target: XXXX" as meaningful info. History has turn numbers.
+
+                } catch (e) {
+                    console.error("Demo Error", e);
+                    showMessage("Error in AI Logic");
+                    callBtn.disabled = false;
+                    callBtn.textContent = 'Error - Retry';
+                    break;
+                }
+            }
+        }
+
         function showMessage(msg) {
             messageArea.textContent = msg;
         }
@@ -867,7 +1070,7 @@
         function updateHistory(result) {
             const item = document.createElement('div');
             item.className = 'history-item';
-            if (result.player === 'AI' || result.player === 'Player 2') {
+            if (result.player === 'AI' || result.player === 'Player 2' || result.player === 'AI Solver') {
                 item.classList.add('ai-move');
             }
 
@@ -886,7 +1089,8 @@
 
         function showWinModal(winnerName) {
             modalTitle.textContent = winnerName === 'You' ? 'SUCCESS!' : `${winnerName} WINS!`;
-            modalSecret.textContent = game.secret.join('');
+            // In demo mode, showing the secret implies showing the target, which is fine
+            modalSecret.textContent = game.mode === 'demo' ? game.demoTarget.join('') : game.secret.join('');
             modalStats.textContent = `Secret found in ${game.turnCount} turns.`;
             resultModal.classList.add('active');
         }
