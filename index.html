@@ -405,7 +405,7 @@
             <p id="modal-stats">You found the secret in 5 turns.</p>
             <div style="display: flex; gap: 10px; width: 100%;">
                 <button class="action-btn" id="modal-close-btn"
-                    style="flex: 1; background: transparent; border: 1px solid var(--text-muted); color: var(--text-muted);">CLOSE</button>
+                    style="flex: 1; background: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.3); color: white;">CLOSE</button>
                 <button class="action-btn" id="restart-btn" style="flex: 1;">PLAY AGAIN</button>
             </div>
         </div>
@@ -1129,6 +1129,7 @@
         }
 
         function showWinModal(winnerName) {
+            console.log("Showing Win Modal");
             modalTitle.textContent = winnerName === 'You' ? 'SUCCESS!' : `${winnerName} WINS!`;
             // In demo mode, showing the secret implies showing the target, which is fine
             modalSecret.textContent = game.mode === 'demo' ? game.demoTarget.join('') : game.secret.join('');
