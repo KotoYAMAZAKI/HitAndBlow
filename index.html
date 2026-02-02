@@ -422,6 +422,7 @@
                 );
                 this.candidates = [...this.allPermutations];
                 this.firstGuess = [0, 1, 2, 3];
+                this.triedHistory = new Set();
             }
 
             generatePermutations(arr, size) {
@@ -450,6 +451,7 @@
 
             reset() {
                 this.candidates = [...this.allPermutations];
+                this.triedHistory.clear();
             }
 
             /**
@@ -464,6 +466,7 @@
                     }
                 }
                 this.candidates = newCandidates;
+                this.triedHistory.add(guess.join(''));
                 console.log(`[AI Solver] Candidates remaining: ${this.candidates.length}`);
             }
 
@@ -500,7 +503,7 @@
 
                 // Default: Standard (Balanced)
                 // 1. First move fixed for optimization
-                if (N === this.allPermutations.length) {
+                if (N === this.allPermutations.length && !this.triedHistory.has(this.firstGuess.join(''))) {
                     return this.firstGuess;
                 }
                 // 2. Mix
@@ -512,7 +515,18 @@
             }
 
             suggestMoveRandom() {
-                if (this.candidates.length === 0) return this.firstGuess;
+                if (this.candidates.length === 0) {
+                    // Fallback using random unused from all perms if candidates exhausted (shouldn't happen in normal play)
+                    // But to be safe and satisfy "never reuse":
+                    for (const p of this.allPermutations) {
+                        if (!this.triedHistory.has(p.join(''))) return p;
+                    }
+                    return [0, 1, 2, 3];
+                }
+
+                // Candidates are valid numbers that match all history.
+                // A played number is removed from candidates unless it was the correct answer (4H).
+                // So simply picking from candidates assumes we don't pick previous wrong answers.
                 const idx = Math.floor(Math.random() * this.candidates.length);
                 return this.candidates[idx];
             }
@@ -534,6 +548,8 @@
                 const searchSpace = (this.candidates.length <= 200) ? this.allPermutations : this.candidates;
 
                 for (const guess of searchSpace) {
+                    if (this.triedHistory.has(guess.join(''))) continue;
+
                     const outcomeCounts = {};
 
                     // Simulate outcomes
@@ -595,6 +611,8 @@
                 const searchSpace = (this.candidates.length <= 200) ? this.allPermutations : this.candidates;
 
                 for (const guess of searchSpace) {
+                    if (this.triedHistory.has(guess.join(''))) continue;
+
                     const outcomeCounts = {};
 
                     for (const secretCandidate of this.candidates) {
@@ -633,6 +651,8 @@
                 const searchSpace = this.allPermutations;
 
                 for (const guess of searchSpace) {
+                    if (this.triedHistory.has(guess.join(''))) continue;
+
                     const outcomeCounts = {};
 
                     for (const secretCandidate of this.candidates) {
