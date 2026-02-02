@@ -403,9 +403,19 @@
             <h2 id="modal-title">SUCCESS!</h2>
             <div class="secret-reveal" id="modal-secret">1234</div>
             <p id="modal-stats">You found the secret in 5 turns.</p>
-            <button class="action-btn" id="restart-btn" style="width: 100%">PLAY AGAIN</button>
+            <div style="display: flex; gap: 10px; width: 100%;">
+                <button class="action-btn" id="modal-close-btn"
+                    style="flex: 1; background: transparent; border: 1px solid var(--text-muted); color: var(--text-muted);">CLOSE</button>
+                <button class="action-btn" id="restart-btn" style="flex: 1;">PLAY AGAIN</button>
+            </div>
         </div>
     </div>
+
+    <!-- Floating button to show result again if closed -->
+    <button id="show-result-btn" class="action-btn"
+        style="position: fixed; bottom: 20px; right: 20px; width: auto; display: none; z-index: 50; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+        🏆 Show Result
+    </button>
 
     <script>
         /**
@@ -850,6 +860,8 @@
         const modalSecret = document.getElementById('modal-secret');
         const modalStats = document.getElementById('modal-stats');
         const restartBtn = document.getElementById('restart-btn');
+        const modalCloseBtn = document.getElementById('modal-close-btn');
+        const showResultBtn = document.getElementById('show-result-btn');
         const modeBtns = document.querySelectorAll('.mode-btn');
 
         let isAiThinking = false;
@@ -869,6 +881,14 @@
         callBtn.addEventListener('click', handleCall);
         restartBtn.addEventListener('click', () => startNewGame(game.mode));
 
+        // Modal Toggles
+        modalCloseBtn.addEventListener('click', () => {
+            resultModal.classList.remove('active');
+        });
+        showResultBtn.addEventListener('click', () => {
+            resultModal.classList.add('active');
+        });
+
         function switchMode(mode) {
             modeBtns.forEach(btn => btn.classList.remove('active'));
             document.querySelector(`button[onclick="switchMode('${mode}')"]`).classList.add('active');
@@ -881,6 +901,7 @@
             historyList.innerHTML = '';
             messageArea.textContent = '';
             resultModal.classList.remove('active');
+            showResultBtn.style.display = 'none'; // Hide floating btn
             isAiThinking = false;
             callBtn.disabled = false;
             inputs.forEach(i => i.disabled = false);
@@ -1113,6 +1134,7 @@
             modalSecret.textContent = game.mode === 'demo' ? game.demoTarget.join('') : game.secret.join('');
             modalStats.textContent = `Secret found in ${game.turnCount} turns.`;
             resultModal.classList.add('active');
+            showResultBtn.style.display = 'block';
         }
 
         // Initialize
